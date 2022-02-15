@@ -1,46 +1,47 @@
 #include <msp430.h>
+#include <stdint.h>
 
 // Flash definitions (W25Q80DVSNIG)
-#define WriteEnable 0x06;
-#define VolatileSRWriteEN 0x50;
-#define WriteDisable 0x04;
-#define ReadSR1 0x05;
-#define ReadSR2 0x35;
-#define WriteSR 0x01;
-#define PageProgram 0x02;          // Same as WriteData
-#define SectorErase_4KB 0x20;
-#define BlockErase_32KB 0x52;
-#define BlockErase_64KB 0xD8;
-#define ChipErase 0xC7;
-#define ProgramSuspend 0x75;
-#define ProgramResume 0x7A;
-#define PowerDown 0xB9;
-#define ReadData 0x03;
-#define FastRead 0x0B;
-#define ReleasePDID 0xAB;
-#define JEDECID 0x9F;
-#define ReadUniqueID 0x4B;
-#define EnableReset 0x66;
-#define Reset 0x99;
-#define DummyByte 0xA5;
+#define WriteEnable 0x06
+#define VolatileSRWriteEN 0x50
+#define WriteDisable 0x04
+#define ReadSR1 0x05
+#define ReadSR2 0x35
+#define WriteSR 0x01
+#define PageProgram 0x02          // Same as WriteData
+#define SectorErase_4KB 0x20
+#define BlockErase_32KB 0x52
+#define BlockErase_64KB 0xD8
+#define ChipErase 0xC7
+#define ProgramSuspend 0x75
+#define ProgramResume 0x7A
+#define PowerDown 0xB9
+#define ReadData 0x03
+#define FastRead 0x0B
+#define ReleasePDID 0xAB
+#define JEDECID 0x9F
+#define ReadUniqueID 0x4B
+#define EnableReset 0x66
+#define Reset 0x99
+#define DummyByte 0xA5
 
+// Pin definitions
 #define BUTTON BIT3
-#define CS BIT4;
+#define CS BIT4
+#define SCLK BIT5
+#define MISO BIT6
+#define MOSI BIT7
 
-char value [] = "h";
-int i = 0;
-volatile int j=0;
 
-void serialTransmit (char *str);
 char receiveByte (void);
 void sendByte (char byte);
 char readSR (char readSRx);
-void writeSR (char SR_addr, char SR_data);
-long readData (unsigned long addr);
-void writeData (char addr, char data);
+void writeSR (uint16_t SR_data);
+char * readData (uint32_t addr, int size);
+void writeData (uint32_t addr, char *data);
 
 void main (void) {
-     WDTCTL = WDTPW | WDTHOLD; // disabling the watchdog timer
+    WDTCTL = WDTPW | WDTHOLD; // disabling the watchdog timer
 
     BCSCTL1 = CALBC1_1MHZ;
     DCOCTL = CALDCO_1MHZ; // setting the clock rate to 1MHz
@@ -52,24 +53,32 @@ void main (void) {
 
     P1DIR |= CS;
     P1OUT |= CS;
-    P1SEL = BIT5 | BIT6 | BIT7;
-    P1SEL2 = BIT5 | BIT6 | BIT7;
+    __delay_cycles(100);
+    P1SEL = SCLK | MISO | MOSI;
+    P1SEL2 = SCLK | MISO | MOSI;
     UCB0CTL1 |= UCSWRST + UCSSEL_2;
     UCB0CTL0 |= UCCKPH + UCMSB + UCMST + UCSYNC;
     UCB0BR0 = 10;
     UCB0CTL1 &= ~UCSWRST;
 
-    IE2 |= UCB0RXIE;
+//    IE2 |= UCB0RXIE;
 //    IE2 |= UCB0TXIE;
 
-    while (1);
-}
 
-void serialTransmit (char *str) {
-    while (*str != 0) {
-        while (!(IFG2 & UCB0TXIFG));
-        UCB0TXBUF = *str++;
-    }
+    // HEHE
+    sendByte (ChipErase); // Erasing the flash
+    __delay_cycles(6000000);
+    char *value = "U";
+    writeData(0x000000, value);
+//    char dataToSend [17] = "existence is pain";
+//    writeData(0x000000, dataToSend);
+      char *store = readData (0x000000, 1);
+
+//    while (1) {
+//        char *store = readData (0x000001, 1);
+//        __delay_cycles(1000000);
+//    }
+      while (1);
 }
 
 char receiveByte (void) {
@@ -85,52 +94,65 @@ void sendByte (char byte) {
 char readSR (char readSRx) {
     char RSR = 0;
     P1OUT &= ~CS;
+    __delay_cycles(100);
     sendByte(readSRx);
     RSR = receiveByte();
     P1OUT |= CS;
+    __delay_cycles(100);
     return RSR;
 }
 
-void writeSR (char SR_addr, char SR_data) {
+void writeSR (uint16_t SR_data) {
     P1OUT &= ~CS;
+    __delay_cycles(100);
     sendByte(WriteEnable);
-    sendByte(SR_addr);
-    sendByte(SR_data);
+    sendByte(WriteSR);
+    sendByte((SR_data >> 8) & (0xFF));
+    sendByte(SR_data & 0xFF);
     sendByte(WriteDisable);
     P1OUT |= CS;
+    __delay_cycles(100);
 }
 
-long readData (unsigned long addr) {
-    char data = 0;
+char *readData (uint32_t addr, int size) {
+    char *data;
+    int i;
     P1OUT &= ~CS;
+    __delay_cycles(100);
+    sendByte(ReadData);
     sendByte((addr >> 16) & (0xFF));
     sendByte((addr >> 8) & (0xFF));
     sendByte(addr & 0xFF);
-    data = receiveByte();
+    for (i=0; i < size; i++) {
+        *data = receiveByte();
+        data++;
+    }
     P1OUT |= CS;
+    __delay_cycles(100);
     return data;
 }
 
-void writeData (char addr, char data) {
+void writeData (uint32_t addr, char *data) {
     P1OUT &= ~CS;
+    __delay_cycles(100);
     sendByte(WriteEnable);
-    sendByte(addr);
-    sendByte(data);
+    sendByte(PageProgram);
+    sendByte((addr >> 16) & (0xFF));
+    sendByte((addr >> 8) & (0xFF));
+    sendByte(addr & 0xFF);
+    while (*data != 0) {
+        sendByte(*data++);
+        __delay_cycles(30000);
+    }
     sendByte(WriteDisable);
     P1OUT |= CS;
+    __delay_cycles(100);
 }
-
-#pragma vector=PORT1_VECTOR
-__interrupt void PORT1_ISR (void) {
-    serial_transmit("h");
-    P1IFG &= ~BUTTON;
-}
-
-// #pragma vector=USCIAB0RX_VECTOR
-// __interrupt void USCIAB0RX_ISR (void) {
-//     *(value + i) = UCB0RXBUF;
-//     if (*(value + i) != 0)
-//         i++;
-//     else
-//         i=0;
-// }
+//
+//#pragma vector=PORT1_VECTOR
+//__interrupt void PORT1_ISR (void) {
+////    char dataToSend [17] = "existence is pain";
+////    writeData(0x000000, dataToSend);
+////    char *store = readData (0x000000, 1);
+//    P1IFG &= ~BUTTON;
+//}
