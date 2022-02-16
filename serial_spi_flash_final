@@ -53,7 +53,7 @@ void main (void) {
 
     P1DIR |= CS;
     P1OUT |= CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     P1SEL = SCLK | MISO | MOSI;
     P1SEL2 = SCLK | MISO | MOSI;
     UCB0CTL1 |= UCSWRST + UCSSEL_2;
@@ -66,13 +66,13 @@ void main (void) {
 
 
     // HEHE
-    sendByte (ChipErase); // Erasing the flash
-    __delay_cycles(6000000);
-    char *value = "U";
-    writeData(0x000000, value);
+//    sendByte (ChipErase); // Erasing the flash
+//    __delay_cycles(6000000);
+//    char *value = "U";
+//    writeData(0x000000, value);
 //    char dataToSend [17] = "existence is pain";
 //    writeData(0x000000, dataToSend);
-      char *store = readData (0x000000, 1);
+    char *store = readData (0x000000, 1);
 
 //    while (1) {
 //        char *store = readData (0x000001, 1);
@@ -82,6 +82,7 @@ void main (void) {
 }
 
 char receiveByte (void) {
+    sendByte(DummyByte);
     while (!(IFG2 & UCB0RXIFG));
     return UCB0RXBUF;
 }
@@ -94,31 +95,31 @@ void sendByte (char byte) {
 char readSR (char readSRx) {
     char RSR = 0;
     P1OUT &= ~CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     sendByte(readSRx);
     RSR = receiveByte();
     P1OUT |= CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     return RSR;
 }
 
 void writeSR (uint16_t SR_data) {
     P1OUT &= ~CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     sendByte(WriteEnable);
     sendByte(WriteSR);
     sendByte((SR_data >> 8) & (0xFF));
     sendByte(SR_data & 0xFF);
     sendByte(WriteDisable);
     P1OUT |= CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
 }
 
 char *readData (uint32_t addr, int size) {
     char *data;
     int i;
     P1OUT &= ~CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     sendByte(ReadData);
     sendByte((addr >> 16) & (0xFF));
     sendByte((addr >> 8) & (0xFF));
@@ -128,13 +129,13 @@ char *readData (uint32_t addr, int size) {
         data++;
     }
     P1OUT |= CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     return data;
 }
 
 void writeData (uint32_t addr, char *data) {
     P1OUT &= ~CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
     sendByte(WriteEnable);
     sendByte(PageProgram);
     sendByte((addr >> 16) & (0xFF));
@@ -146,7 +147,7 @@ void writeData (uint32_t addr, char *data) {
     }
     sendByte(WriteDisable);
     P1OUT |= CS;
-    __delay_cycles(100);
+    __delay_cycles(40);
 }
 //
 //#pragma vector=PORT1_VECTOR
