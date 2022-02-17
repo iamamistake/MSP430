@@ -44,6 +44,8 @@
 #define TIME_WINDOW 0x3D
 #define ACT_THIS 0x3E
 #define ACT_DUR 0x3F
+#define DummyByte 0x00
+#define READ BIT7;
 
 // Pin definitions
 #define BUTTON BIT3
@@ -52,13 +54,12 @@
 #define MISO BIT6
 #define MOSI BIT7
 
-
+void enableCS (void);
+void disableCS (void);
 char receiveByte (void);
 void sendByte (char byte);
-char readSR (char readSRx);
-void writeSR (uint16_t SR_data);
-char * readData (uint32_t addr, int size);
-void writeData (uint32_t addr, char *data);
+// char * readData (uint32_t addr, int size);
+// void writeData (uint32_t addr, char *data);
 
 void main (void) {
     WDTCTL = WDTPW | WDTHOLD; // disabling the watchdog timer
@@ -72,39 +73,47 @@ void main (void) {
     _enable_interrupts();
 
     P1DIR |= CS;
-    P1OUT |= CS;
-    __delay_cycles(40);
+    disableCS();
     P1SEL = SCLK | MISO | MOSI;
     P1SEL2 = SCLK | MISO | MOSI;
     UCB0CTL1 |= UCSWRST + UCSSEL_2;
-    UCB0CTL0 |= UCCKPH + UCMSB + UCMST + UCSYNC;
+    UCB0CTL0 |= UCCKPL + UCMSB + UCMST + UCSYNC; // try including UCCKPH later
     UCB0BR0 = 10;
     UCB0CTL1 &= ~UCSWRST;
 
-//    IE2 |= UCB0RXIE;
-//    IE2 |= UCB0TXIE;
+    IE2 |= UCB0RXIE;
+    // IE2 |= UCB0TXIE;
 
+    // read from WHO_AM_I register
+    enableCS();
+    sendByte((READ + WHO_AM_I));
+    sendByte(DummyByte);
+    disableCS();
 
-    // HEHE
-//    sendByte (ChipErase); // Erasing the flash
-//    __delay_cycles(6000000);
-//    char *value = "U";
-//    writeData(0x000000, value);
-//    char dataToSend [17] = "existence is pain";
-//    writeData(0x000000, dataToSend);
-    char *store = readData (0x000000, 1);
+    // write and read from register
+    char data = 0x45;
+    enableCS();
+    sendByte(CTRL_REG0);
+    sendByte(data);
+    disableCS();
+    __delay_cycles(1000000);
+    enableCS();
+    sendByte((READ+CTRL_REG0));
+    sendByte(DummyByte);
+    disableCS();
 
-//    while (1) {
-//        char *store = readData (0x000001, 1);
-//        __delay_cycles(1000000);
-//    }
-      while (1);
+    while (1);
 }
 
-char receiveByte (void) {
-    sendByte(DummyByte);
-    while (!(IFG2 & UCB0RXIFG));
-    return UCB0RXBUF;
+void enableCS (void) {
+    P1OUT &= ~CS;
+    __delay_cycles(1);
+}
+
+void disableCS (void) {
+    __delay_cycles(1);
+    P1OUT |= CS;
+    __delay_cycles(1);
 }
 
 void sendByte (char byte) {
@@ -112,68 +121,44 @@ void sendByte (char byte) {
     UCB0TXBUF = byte;
 }
 
-char readSR (char readSRx) {
-    char RSR = 0;
-    P1OUT &= ~CS;
-    __delay_cycles(40);
-    sendByte(readSRx);
-    RSR = receiveByte();
-    P1OUT |= CS;
-    __delay_cycles(40);
-    return RSR;
+
+#pragma vector=USCIAB0RX_VECTOR
+__interrupt void USCIAB0RX_ISR (void) {
+    value = UCB0RXBUF;
 }
 
-void writeSR (uint16_t SR_data) {
-    P1OUT &= ~CS;
-    __delay_cycles(40);
-    sendByte(WriteEnable);
-    sendByte(WriteSR);
-    sendByte((SR_data >> 8) & (0xFF));
-    sendByte(SR_data & 0xFF);
-    sendByte(WriteDisable);
-    P1OUT |= CS;
-    __delay_cycles(40);
-}
 
-char *readData (uint32_t addr, int size) {
-    char *data;
-    int i;
-    P1OUT &= ~CS;
-    __delay_cycles(40);
-    sendByte(ReadData);
-    sendByte((addr >> 16) & (0xFF));
-    sendByte((addr >> 8) & (0xFF));
-    sendByte(addr & 0xFF);
-    for (i=0; i < size; i++) {
-        *data = receiveByte();
-        data++;
-    }
-    P1OUT |= CS;
-    __delay_cycles(40);
-    return data;
-}
 
-void writeData (uint32_t addr, char *data) {
-    P1OUT &= ~CS;
-    __delay_cycles(40);
-    sendByte(WriteEnable);
-    sendByte(PageProgram);
-    sendByte((addr >> 16) & (0xFF));
-    sendByte((addr >> 8) & (0xFF));
-    sendByte(addr & 0xFF);
-    while (*data != 0) {
-        sendByte(*data++);
-        __delay_cycles(30000);
-    }
-    sendByte(WriteDisable);
-    P1OUT |= CS;
-    __delay_cycles(40);
-}
-//
-//#pragma vector=PORT1_VECTOR
-//__interrupt void PORT1_ISR (void) {
-////    char dataToSend [17] = "existence is pain";
-////    writeData(0x000000, dataToSend);
-////    char *store = readData (0x000000, 1);
-//    P1IFG &= ~BUTTON;
-//}
+
+
+
+// char *readData (uint32_t addr, int size) {
+//     char *data;
+//     int i;
+//     enableCS();
+//     sendByte(ReadData);
+//     sendByte((addr >> 16) & (0xFF));
+//     sendByte((addr >> 8) & (0xFF));
+//     sendByte(addr & 0xFF);
+//     for (i=0; i < size; i++) {
+//         *data = receiveByte();
+//         data++;
+//     }
+//     disableCS();
+//     return data;
+// }
+
+// void writeData (uint32_t addr, char *data) {
+//     enableCS();
+//     sendByte(WriteEnable);
+//     sendByte(PageProgram);
+//     sendByte((addr >> 16) & (0xFF));
+//     sendByte((addr >> 8) & (0xFF));
+//     sendByte(addr & 0xFF);
+//     while (*data != 0) {
+//         sendByte(*data++);
+//         __delay_cycles(30000);
+//     }
+//     sendByte(WriteDisable);
+//     disableCS();
+// }
