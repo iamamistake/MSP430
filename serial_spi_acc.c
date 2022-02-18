@@ -45,10 +45,9 @@
 #define ACT_THIS 0x3E
 #define ACT_DUR 0x3F
 #define DummyByte 0x00
-#define READ BIT7;
+#define READ BIT7
 
 // Pin definitions
-#define BUTTON BIT3
 #define CS BIT4
 #define SCLK BIT5
 #define MISO BIT6
@@ -67,9 +66,6 @@ void main (void) {
     BCSCTL1 = CALBC1_1MHZ;
     DCOCTL = CALDCO_1MHZ; // setting the clock rate to 1MHz
 
-    P1IE |= BUTTON;
-    P1IES |= BUTTON;
-    P1IFG &= ~BUTTON;
     _enable_interrupts();
 
     P1DIR |= CS;
@@ -91,16 +87,16 @@ void main (void) {
     disableCS();
 
     // write and read from register
-    char data = 0x45;
-    enableCS();
-    sendByte(CTRL_REG0);
-    sendByte(data);
-    disableCS();
-    __delay_cycles(1000000);
-    enableCS();
-    sendByte((READ+CTRL_REG0));
-    sendByte(DummyByte);
-    disableCS();
+//     char data = 0x45;
+//     enableCS();
+//     sendByte(CTRL_REG0);
+//     sendByte(data);
+//     disableCS();
+//     __delay_cycles(1000000);
+//     enableCS();
+//     sendByte((READ+CTRL_REG0));
+//     sendByte(DummyByte);
+//     disableCS();
 
     while (1);
 }
