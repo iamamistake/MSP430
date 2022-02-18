@@ -107,6 +107,7 @@ void enableCS (void) {
 }
 
 void disableCS (void) {
+    while (!(IFG2 & UCB0TXIFG));
     __delay_cycles(1);
     P1OUT |= CS;
     __delay_cycles(1);
